@@ -1,0 +1,17 @@
+{
+  "expo": {
+    "name": "ListManageAndCompare",
+    "slug": "list-manage-and-compare",
+    "version": "1.0.0",
+    "platforms": ["web", "android"],
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "backgroundColor": "#ffffff"
+    },
+    "assetBundlePatterns": ["**/*"],
+    "web": {
+      "bundler": "metro"
+    }
+  }
+}

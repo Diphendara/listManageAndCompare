@@ -1,0 +1,310 @@
+/**
+ * Custom Lists section per specs.md §8: three vertical columns.
+ * Left: List cards (clickable) | Center: List preview | Right: List editor.
+ */
+
+import React, { useState, useEffect, useCallback } from "react";
+import { View, StyleSheet, Alert, TextInput, Pressable, Text } from "react-native";
+import type { CustomList, ListItem } from "../../models/CustomList";
+import type { CustomListsService } from "../../services/customListsService";
+import { parseListText } from "../../parsers/listItemParser";
+import { ListCards } from "./ListCards";
+import { ListPreview } from "./ListPreview";
+import { ListEditor } from "./ListEditor";
+import { Card } from "../../components/Card";
+import { Button } from "../../components/Button";
+
+export interface CustomListsScreenProps {
+  customListsService: CustomListsService;
+  refreshTrigger?: number;
+}
+
+export function CustomListsScreen({
+  customListsService,
+  refreshTrigger,
+}: CustomListsScreenProps): React.JSX.Element {
+  const [lists, setLists] = useState<CustomList[]>([]);
+  const [selectedListName, setSelectedListName] = useState<string | null>(null);
+  const [selectedListEditName, setSelectedListEditName] = useState<string>("");
+  const [editorText, setEditorText] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [expandedDeleteListName, setExpandedDeleteListName] = useState<string | null>(null);
+  const [showCreateInput, setShowCreateInput] = useState(false);
+  const [createName, setCreateName] = useState("");
+
+  // Load lists on mount and when refreshTrigger changes
+  useEffect(() => {
+    async function loadLists() {
+      try {
+        setLoading(true);
+        const loadedLists = await customListsService.getAllLists();
+        setLists(loadedLists);
+      } catch (err) {
+        console.error("Failed to load lists:", err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadLists();
+  }, [customListsService, refreshTrigger]);
+
+  const selectedList = lists.find((l) => l.name === selectedListName) || null;
+
+  const handleSelectList = useCallback((listName: string) => {
+    setSelectedListName(listName);
+    setSelectedListEditName(listName);
+    const list = lists.find((l) => l.name === listName);
+    if (list) {
+      // Format decklist back to text
+      const text = list.decklist.map((item) => `${item.quantity}x ${item.name}`).join("\n");
+      setEditorText(text);
+    }
+  }, [lists]);
+
+  const handleCreateList = useCallback(async () => {
+    // Open inline input for list name
+    setCreateName("");
+    setShowCreateInput(true);
+  }, [lists, editorText, customListsService]);
+
+  const handleConfirmCreate = useCallback(async () => {
+    const listName = createName?.trim();
+    if (!listName) return;
+
+    // Check if list already exists
+    const exists = lists.some((l) => l.name === listName);
+    if (exists) {
+      Alert.alert("Error", "A list with that name already exists");
+      return;
+    }
+
+    // Parse the editor text
+    const result = parseListText(editorText);
+    if (!result.ok) {
+      Alert.alert("Parse Error", result.error);
+      return;
+    }
+
+    // Create new list
+    const newList: CustomList = {
+      name: listName,
+      inUse: true,
+      decklist: result.items,
+    };
+
+    try {
+      setLoading(true);
+      await customListsService.saveList(newList);
+      setLists([...lists, newList]);
+      setEditorText("");
+      setShowCreateInput(false);
+      Alert.alert("Success", `List "${newList.name}" created`);
+    } catch (err) {
+      Alert.alert(
+        "Save Error",
+        err instanceof Error ? err.message : "Unknown error"
+      );
+    } finally {
+      setLoading(false);
+    }
+  }, [createName, lists, editorText, customListsService]);
+
+  const handleCancelCreate = useCallback(() => {
+    setShowCreateInput(false);
+    setCreateName("");
+  }, []);
+
+  const handleUpdateList = useCallback(async () => {
+    if (!selectedListName) {
+      Alert.alert("Error", "No list selected");
+      return;
+    }
+
+    // Parse the editor text
+    const result = parseListText(editorText);
+    if (!result.ok) {
+      Alert.alert("Parse Error", result.error);
+      return;
+    }
+
+    // Get the current list from the lists array
+    const currentList = lists.find((l) => l.name === selectedListName);
+    if (!currentList) {
+      Alert.alert("Error", "List not found");
+      return;
+    }
+
+    const newName = selectedListEditName?.trim() || selectedListName;
+
+    // Prevent rename conflict
+    if (newName !== selectedListName && lists.some((l) => l.name === newName)) {
+      Alert.alert("Error", "Ya existe una lista con ese nombre");
+      return;
+    }
+
+    const updatedList: CustomList = {
+      ...currentList,
+      name: newName,
+      decklist: result.items,
+    };
+
+    try {
+      setLoading(true);
+      // Save under new name (or same name)
+      await customListsService.saveList(updatedList);
+
+      // If renamed, delete old file and update listasEnUso.json by replacing the name
+      if (newName !== selectedListName) {
+        await customListsService.deleteList(selectedListName, newName);
+      }
+
+      // Update local lists in place
+      const newLists = lists.map((l) => (l.name === selectedListName ? updatedList : l));
+      setLists(newLists);
+      setSelectedListName(newName);
+      setSelectedListEditName(newName);
+      Alert.alert("✓ Éxito", `Lista "${updatedList.name}" actualizada`);
+    } catch (err) {
+      Alert.alert(
+        "❌ Error",
+        err instanceof Error ? err.message : "No se pudo actualizar la lista"
+      );
+    } finally {
+      setLoading(false);
+    }
+  }, [selectedListName, lists, editorText, customListsService, selectedListEditName]);
+
+  const handleToggleInUse = useCallback(
+    async (listName: string, inUse: boolean) => {
+      try {
+        await customListsService.updateListInUseStatus(listName, inUse);
+        setLists(
+          lists.map((l) => (l.name === listName ? { ...l, inUse } : l))
+        );
+      } catch (err) {
+        Alert.alert(
+          "Error",
+          err instanceof Error ? err.message : "Unknown error"
+        );
+      }
+    },
+    [lists, customListsService]
+  );
+
+  const handleDeleteList = useCallback(
+    (listName: string) => {
+      setExpandedDeleteListName(
+        expandedDeleteListName === listName ? null : listName
+      );
+    },
+    [expandedDeleteListName]
+  );
+
+  const handleConfirmDeleteList = useCallback(
+    async (listName: string) => {
+      try {
+        setLoading(true);
+        await customListsService.deleteList(listName);
+        setLists(lists.filter((l) => l.name !== listName));
+        if (selectedListName === listName) {
+          setSelectedListName(null);
+          setEditorText("");
+        }
+        setExpandedDeleteListName(null);
+        Alert.alert("✓ Éxito", `Lista "${listName}" eliminada`);
+      } catch (err) {
+        Alert.alert(
+          "❌ Error",
+          err instanceof Error ? err.message : "No se pudo eliminar la lista"
+        );
+      } finally {
+        setLoading(false);
+      }
+    },
+    [lists, selectedListName, customListsService]
+  );
+
+  return (
+    <View style={styles.container}>
+      <View style={styles.column}>
+        <ListCards
+          lists={lists}
+          selectedListName={selectedListName}
+          onSelectList={handleSelectList}
+          onToggleInUse={handleToggleInUse}
+          onDeleteList={handleDeleteList}
+          expandedDeleteListName={expandedDeleteListName}
+          onConfirmDeleteList={handleConfirmDeleteList}
+          loading={loading}
+        />
+      </View>
+      <View style={styles.column}>
+        <ListPreview selectedList={selectedList} />
+      </View>
+      <View style={styles.column}>
+        {showCreateInput && (
+          <Card>
+            <Text style={styles.cardTitle}>Crear nueva lista</Text>
+            <TextInput
+              style={styles.createInput}
+              placeholder="Nombre de la lista"
+              value={createName}
+              onChangeText={setCreateName}
+              editable={!loading}
+            />
+            <View style={styles.createActions}>
+              <Pressable style={styles.createCancel} onPress={handleCancelCreate} disabled={loading}>
+                <Text style={styles.createActionText}>Cancelar</Text>
+              </Pressable>
+              <Pressable style={styles.createConfirm} onPress={handleConfirmCreate} disabled={loading}>
+                <Text style={styles.createActionText}>{loading ? "Creando..." : "Crear"}</Text>
+              </Pressable>
+            </View>
+          </Card>
+        )}
+
+        <ListEditor
+          editorText={editorText}
+          onEditorTextChange={setEditorText}
+          onCreateList={handleCreateList}
+          onUpdateList={handleUpdateList}
+          hasSelectedList={selectedList !== null}
+        />
+      </View>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    flexDirection: "row",
+  },
+  column: {
+    flex: 1,
+  },
+  cardTitle: { fontWeight: "bold", marginBottom: 8 },
+  createInput: {
+    borderWidth: 1,
+    borderColor: "#ccc",
+    padding: 8,
+    marginBottom: 8,
+  },
+  createActions: { flexDirection: "row", justifyContent: "space-between" },
+  createCancel: {
+    flex: 1,
+    marginRight: 8,
+    padding: 10,
+    backgroundColor: "#eee",
+    borderRadius: 4,
+    alignItems: "center",
+  },
+  createConfirm: {
+    flex: 1,
+    padding: 10,
+    backgroundColor: "#2196f3",
+    borderRadius: 4,
+    alignItems: "center",
+  },
+  createActionText: { color: "#fff", fontWeight: "600" },
+});
