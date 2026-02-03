@@ -17,6 +17,7 @@ export interface ListEditorProps {
   listName?: string;
   onListNameChange?: (v: string) => void;
   onListNameSubmit?: () => void;
+  updateMessage?: string | null;
 }
 
 export function ListEditor({
@@ -28,6 +29,7 @@ export function ListEditor({
   listName,
   onListNameChange,
   onListNameSubmit,
+  updateMessage,
 }: ListEditorProps): React.JSX.Element {
   return (
     <View style={styles.column}>
@@ -42,12 +44,7 @@ export function ListEditor({
           returnKeyType="done"
         />
       )}
-      <TextArea
-        value={editorText}
-        onChangeText={onEditorTextChange}
-        placeholder="e.g. 3x Item A&#10;2x Item B"
-      />
-      <View style={styles.buttonContainer}>
+      <View style={[styles.buttonContainer, styles.buttonSpacing]}>
         <View style={styles.buttonWrapper}>
           <Button title="Crear lista" onPress={onCreateList} />
         </View>
@@ -59,6 +56,14 @@ export function ListEditor({
           />
         </View>
       </View>
+      {updateMessage ? (
+        <Text style={styles.successMessage}>{updateMessage}</Text>
+      ) : null}
+      <TextArea
+        value={editorText}
+        onChangeText={onEditorTextChange}
+        placeholder="e.g. 3x Item A&#10;2x Item B"
+      />
     </View>
   );
 }
@@ -74,4 +79,6 @@ const styles = StyleSheet.create({
   },
   buttonContainer: { flexDirection: "row", gap: 8 },
   buttonWrapper: { flex: 1 },
+  buttonSpacing: { marginBottom: 5 },
+  successMessage: { color: "#2e7d32", marginBottom: 6, fontWeight: "600" },
 });

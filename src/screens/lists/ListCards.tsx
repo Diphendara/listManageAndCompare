@@ -4,7 +4,7 @@
  */
 
 import React from "react";
-import { View, Text, ScrollView, StyleSheet, Pressable, Alert } from "react-native";
+import { View, Text, ScrollView, StyleSheet, Pressable, Alert, useWindowDimensions } from "react-native";
 import type { CustomList } from "../../models/CustomList";
 import { Card } from "../../components/Card";
 import { Button } from "../../components/Button";
@@ -30,6 +30,8 @@ export function ListCards({
   onConfirmDeleteList,
   loading,
 }: ListCardsProps): React.JSX.Element {
+  const { width } = useWindowDimensions();
+  const isMobile = width < 768;
   const getTotalQuantity = (list: CustomList): number => {
     return list.decklist.reduce((sum, item) => sum + item.quantity, 0);
   };
@@ -50,17 +52,27 @@ export function ListCards({
                 <Pressable
                   style={[
                     styles.card,
+                    isMobile && styles.cardMobile,
                     selectedListName === list.name && styles.cardSelected,
                   ]}
                   onPress={() => onSelectList(list.name)}
                 >
                   <View style={styles.cardContent}>
                     <Text style={styles.listName} numberOfLines={3}>
-                      {list.name} <Text style={styles.itemCount}>[{getTotalQuantity(list)} items]</Text>
+                      {list.name}
                     </Text>
+                    {isMobile ? (
+                      <Text style={styles.itemCountMobile}>
+                        [{getTotalQuantity(list)} items]
+                      </Text>
+                    ) : (
+                      <Text style={styles.itemCount}>
+                        [{getTotalQuantity(list)} items]
+                      </Text>
+                    )}
                   </View>
 
-                  <View style={styles.actions}>
+                  <View style={[styles.actions, isMobile && styles.actionsMobile]}>
                     <Pressable
                       style={styles.checkbox}
                       onPress={() => onToggleInUse(list.name, !list.inUse)}
@@ -151,6 +163,10 @@ const styles = StyleSheet.create({
     alignItems: "flex-start",
     minHeight: 50,
   },
+  cardMobile: {
+    flexDirection: "column",
+    alignItems: "stretch",
+  },
   cardSelected: {
     backgroundColor: "#e3f2fd",
     borderColor: "#2196f3",
@@ -159,6 +175,7 @@ const styles = StyleSheet.create({
   cardContent: { marginBottom: 4 },
   listName: { fontWeight: "bold", fontSize: 13, marginBottom: 0 },
   itemCount: { color: "#888", fontSize: 9 },
+  itemCountMobile: { color: "#888", fontSize: 10, marginTop: 2 },
   checkbox: {
     flexDirection: "row",
     alignItems: "center",
@@ -189,6 +206,14 @@ const styles = StyleSheet.create({
     gap: 6,
     justifyContent: "flex-start",
     marginRight: 4,
+  },
+  actionsMobile: {
+    flexDirection: "row",
+    justifyContent: "flex-start",
+    alignItems: "center",
+    marginTop: 6,
+    marginRight: 0,
+    gap: 10,
   },
   deleteButton: {
     padding: 0,

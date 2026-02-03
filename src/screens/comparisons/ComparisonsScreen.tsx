@@ -10,21 +10,146 @@ import {
   ScrollView,
   Pressable,
   Alert,
+  useWindowDimensions,
 } from "react-native";
 import type { InventoryService } from "../../services/inventoryService";
 import type { CustomListsService } from "../../services/customListsService";
 import { SearchBar } from "../../components/SearchBar";
 import { TextArea } from "../../components/TextArea";
+import { Button } from "../../components/Button";
 import { parseText } from "../../parsers/itemParser";
 import type { Inventory } from "../../models/Inventory";
 import type { CustomList } from "../../models/CustomList";
 import type { Item } from "../../models/Item";
+import { toTitleCase } from "../../utils/textFormat";
 
 export interface ComparisonsScreenProps {
   inventoryService?: InventoryService;
   customListsService?: CustomListsService;
   refreshTrigger?: number;
 }
+
+interface LeftColumnProps {
+  isMobile: boolean;
+  expandedListsSection: boolean;
+  onToggleExpandedListsSection: () => void;
+  lists: CustomList[];
+  searchQuery: string;
+  onSearchQueryChange: (value: string) => void;
+  filteredInventory: Array<{ name: string; quantity: number }>;
+  listTotalsByName: Map<string, number>;
+  expandedItem: string | null;
+  onToggleExpandedItem: (key: string | null) => void;
+  listsWithItemByName: Map<string, CustomList[]>;
+  onToggleListInUse: (listName: string, inUse: boolean) => void;
+}
+
+const LeftColumn = React.memo(function LeftColumn({
+  isMobile,
+  expandedListsSection,
+  onToggleExpandedListsSection,
+  lists,
+  searchQuery,
+  onSearchQueryChange,
+  filteredInventory,
+  listTotalsByName,
+  expandedItem,
+  onToggleExpandedItem,
+  listsWithItemByName,
+  onToggleListInUse,
+}: LeftColumnProps): React.JSX.Element {
+  return (
+    <View style={[styles.column, isMobile && styles.columnMobileTop]}>
+      <Text style={styles.columnTitle}>Inventario en uso</Text>
+
+      <View style={styles.listsGridWrapper}>
+        <Pressable
+          style={styles.listsHeaderButton}
+          onPress={onToggleExpandedListsSection}
+        >
+          <Text style={styles.listsTitle}>
+            Listas cargadas {isMobile && (expandedListsSection ? "▼" : "▶")}
+          </Text>
+        </Pressable>
+        {expandedListsSection && (
+          <>
+            {lists.length === 0 ? (
+              <Text style={styles.empty}>No hay listas</Text>
+            ) : (
+              <View style={styles.grid}>
+                {lists.map((l) => (
+                  <Pressable
+                    key={l.name}
+                    style={styles.gridItem}
+                    onPress={() => onToggleListInUse(l.name, !l.inUse)}
+                  >
+                    <Text style={styles.gridItemName} numberOfLines={2}>
+                      {l.name}
+                    </Text>
+                    <View
+                      style={[
+                        styles.checkboxLabel,
+                        l.inUse && styles.checkboxLabelChecked,
+                      ]}
+                    >
+                      <Text style={styles.checkboxLabelText}>{l.inUse ? "✓" : ""}</Text>
+                    </View>
+                  </Pressable>
+                ))}
+              </View>
+            )}
+          </>
+        )}
+      </View>
+
+      <SearchBar
+        value={searchQuery}
+        onChangeText={onSearchQueryChange}
+        placeholder="Buscar por nombre"
+      />
+
+      <ScrollView style={[styles.scroll, isMobile && styles.scrollMobile]}>
+        {filteredInventory.length === 0 ? (
+          <Text style={styles.empty}>No hay items</Text>
+        ) : (
+          filteredInventory.map((it) => {
+            const key = it.name.trim().toLowerCase();
+            const listTotal = listTotalsByName.get(key) ?? 0;
+            const isMatch = listTotal === it.quantity;
+            const isExpanded = expandedItem === key;
+            const listsWithItem = listsWithItemByName.get(key) ?? [];
+
+            return (
+              <View key={it.name}>
+                <Pressable
+                  style={styles.invRow}
+                  onPress={() => onToggleExpandedItem(isExpanded ? null : key)}
+                >
+                  <Text style={[styles.invName, isMatch && styles.invMatch]}>
+                    {toTitleCase(it.name)}
+                  </Text>
+                  <Text style={[styles.invQty, isMatch && styles.invMatch]}>
+                    {listTotal}/{it.quantity}
+                  </Text>
+                </Pressable>
+                {isExpanded && listsWithItem.length > 0 && (
+                  <View style={styles.expandedSection}>
+                    <Text style={styles.expandedTitle}>En uso en:</Text>
+                    {listsWithItem.map((list) => (
+                      <Text key={list.name} style={styles.expandedListName}>
+                        • {list.name}
+                      </Text>
+                    ))}
+                  </View>
+                )}
+              </View>
+            );
+          })
+        )}
+      </ScrollView>
+    </View>
+  );
+});
 
 /**
  * Comparisons section: four vertical columns.
@@ -35,11 +160,36 @@ export function ComparisonsScreen({
   customListsService,
   refreshTrigger,
 }: ComparisonsScreenProps): React.JSX.Element {
+  const { width } = useWindowDimensions();
+  const isMobile = width < 768;
+  
   const [inventory, setInventory] = useState<Inventory>([]);
   const [lists, setLists] = useState<CustomList[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [desiredListText, setDesiredListText] = useState("");
+  const [textAreaValue, setTextAreaValue] = useState("");
   const [expandedItem, setExpandedItem] = useState<string | null>(null);
+  const [showResults, setShowResults] = useState(false);
+  const [expandedListsSection, setExpandedListsSection] = useState(!isMobile);
+
+  const handleToggleExpandedListsSection = useCallback(() => {
+    if (!isMobile) return;
+    setExpandedListsSection((prev) => !prev);
+  }, [isMobile]);
+
+  const handleCheckDesiredList = useCallback(() => {
+    setDesiredListText(textAreaValue);
+    setShowResults(true);
+  }, [textAreaValue]);
+
+  const handleTextAreaKeyPress = useCallback(
+    (event: { nativeEvent: { key: string } }) => {
+      if (event.nativeEvent.key === "Enter") {
+        handleCheckDesiredList();
+      }
+    },
+    [handleCheckDesiredList]
+  );
 
   const loadInventory = useCallback(async () => {
     if (!inventoryService) return;
@@ -71,9 +221,11 @@ export function ComparisonsScreen({
   }, [inventory]);
 
   // Search by name only (ignore tags and any # prefix behavior)
-  const filteredInventory = groupedInventory.filter((it) =>
-    it.name.toLowerCase().includes(searchQuery.trim().toLowerCase())
-  );
+  const filteredInventory = React.useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    if (query.length === 0) return groupedInventory;
+    return groupedInventory.filter((it) => it.name.toLowerCase().includes(query));
+  }, [groupedInventory, searchQuery]);
 
   // Sum quantities by name across ALL saved lists (regardless of inUse)
   const listTotalsByName = React.useMemo(() => {
@@ -87,8 +239,30 @@ export function ComparisonsScreen({
     return totals;
   }, [lists]);
 
+  // Pre-compute which lists contain each item (for expanded view)
+  const listsWithItemByName = React.useMemo(() => {
+    const map = new Map<string, CustomList[]>();
+    for (const list of lists) {
+      if (!list.inUse) continue;
+      for (const item of list.decklist) {
+        const key = item.name.trim().toLowerCase();
+        const existing = map.get(key) ?? [];
+        if (!existing.includes(list)) {
+          existing.push(list);
+        }
+        map.set(key, existing);
+      }
+    }
+    return map;
+  }, [lists]);
+
   // Parse desired list and compute have/missing
   const { cardsYouHave, cardsMissing } = React.useMemo(() => {
+    // Only compute if showResults is true (both mobile and web)
+    if (!showResults) {
+      return { cardsYouHave: [], cardsMissing: [] };
+    }
+    
     const result = parseText(desiredListText);
     const have: Array<Item & { inInventory: number }> = [];
     const missing: Array<Item & { inInventory: number }> = [];
@@ -115,9 +289,9 @@ export function ComparisonsScreen({
       }
     }
     return { cardsYouHave: have, cardsMissing: missing };
-  }, [desiredListText, groupedInventory, listTotalsByName]);
+  }, [desiredListText, groupedInventory, listTotalsByName, isMobile, showResults]);
 
-  const handleToggleInUse = async (listName: string, inUse: boolean) => {
+  const handleToggleInUse = useCallback(async (listName: string, inUse: boolean) => {
     if (!customListsService) return;
     // Optimistically update local state to preserve displayed order
     let previous: CustomList[] = [];
@@ -133,133 +307,90 @@ export function ComparisonsScreen({
       setLists(previous);
       Alert.alert("Error", "No se pudo actualizar el estado de la lista");
     }
-  };
+  }, [customListsService]);
 
   return (
-    <View style={styles.container}>
-      <View style={styles.column}>
-        <Text style={styles.columnTitle}>Inventario en uso</Text>
+    <View style={[styles.container, isMobile && styles.containerMobile]}>
+      <LeftColumn
+        isMobile={isMobile}
+        expandedListsSection={expandedListsSection}
+        onToggleExpandedListsSection={handleToggleExpandedListsSection}
+        lists={lists}
+        searchQuery={searchQuery}
+        onSearchQueryChange={setSearchQuery}
+        filteredInventory={filteredInventory}
+        listTotalsByName={listTotalsByName}
+        expandedItem={expandedItem}
+        onToggleExpandedItem={setExpandedItem}
+        listsWithItemByName={listsWithItemByName}
+        onToggleListInUse={handleToggleInUse}
+      />
 
-        <View style={styles.listsGridWrapper}>
-          <Text style={styles.listsTitle}>Listas cargadas</Text>
-          {lists.length === 0 ? (
-            <Text style={styles.empty}>No hay listas</Text>
-          ) : (
-            <View style={styles.grid}>
-              {lists.map((l) => (
-                <Pressable
-                  key={l.name}
-                  style={styles.gridItem}
-                  onPress={() => handleToggleInUse(l.name, !l.inUse)}
-                >
-                  <Text style={styles.gridItemName} numberOfLines={2}>
-                    {l.name}
-                  </Text>
-                  <View
-                    style={[
-                      styles.checkboxLabel,
-                      l.inUse && styles.checkboxLabelChecked,
-                    ]}
-                  >
-                    <Text style={styles.checkboxLabelText}>{l.inUse ? "✓" : ""}</Text>
-                  </View>
-                </Pressable>
-              ))}
-            </View>
-          )}
-        </View>
-
-        <SearchBar
-          value={searchQuery}
-          onChangeText={setSearchQuery}
-          placeholder="Buscar por nombre"
-        />
-
-        <ScrollView style={styles.scroll}>
-          {filteredInventory.length === 0 ? (
-            <Text style={styles.empty}>No hay items</Text>
-          ) : (
-            filteredInventory.map((it) => {
-              const listTotal = listTotalsByName.get(it.name.trim().toLowerCase()) ?? 0;
-              const isMatch = listTotal === it.quantity;
-              const key = it.name.trim().toLowerCase();
-              const isExpanded = expandedItem === key;
-              
-              // Find lists that contain this item and are inUse
-              const listsWithItem = lists.filter((list) => {
-                return list.inUse && list.decklist.some(
-                  (item) => item.name.trim().toLowerCase() === key
-                );
-              });
-              
-              return (
-                <View key={it.name}>
-                  <Pressable
-                    style={styles.invRow}
-                    onPress={() => setExpandedItem(isExpanded ? null : key)}
-                  >
-                    <Text style={[styles.invName, isMatch && styles.invMatch]}>{it.name}</Text>
-                    <Text style={[styles.invQty, isMatch && styles.invMatch]}>
-                      {listTotal}/{it.quantity}
+      {(!isMobile || showResults) && (
+        <>
+          <View style={[styles.column, isMobile && styles.columnMobileResults]}>
+            <Text style={styles.columnTitle}>Cartas que tienes</Text>
+            <ScrollView style={styles.scroll}>
+              {cardsYouHave.length === 0 ? (
+                <Text style={styles.empty}>No hay cartas</Text>
+              ) : (
+                cardsYouHave.map((item, i) => (
+                  <View key={`${item.name}-${item.tag ?? ""}-${i}`} style={styles.cardRow}>
+                    <Text style={styles.cardName}>
+                      {item.quantity}x {toTitleCase(item.name)}
                     </Text>
-                  </Pressable>
-                  {isExpanded && listsWithItem.length > 0 && (
-                    <View style={styles.expandedSection}>
-                      <Text style={styles.expandedTitle}>En uso en:</Text>
-                      {listsWithItem.map((list) => (
-                        <Text key={list.name} style={styles.expandedListName}>
-                          • {list.name}
-                        </Text>
-                      ))}
-                    </View>
-                  )}
-                </View>
-              );
-            })
-          )}
+                  </View>
+                ))
+              )}
+            </ScrollView>
+          </View>
+          <View style={[styles.column, isMobile && styles.columnMobileResults]}>
+            <Text style={styles.columnTitle}>Cartas que faltan</Text>
+            <ScrollView style={styles.scroll}>
+              {cardsMissing.length === 0 ? (
+                <Text style={styles.empty}>No hay cartas</Text>
+              ) : (
+                cardsMissing.map((item, i) => (
+                  <View key={`${item.name}-${item.tag ?? ""}-${i}`} style={styles.cardRow}>
+                    <Text style={styles.cardName}>
+                      {item.quantity}x {toTitleCase(item.name)}
+                    </Text>
+                  </View>
+                ))
+              )}
+            </ScrollView>
+          </View>
+        </>
+      )}
+      
+      {isMobile ? (
+        <ScrollView style={[styles.column, styles.columnMobileBottom]}>
+          <Text style={styles.columnTitle}>Lista deseada</Text>
+          <View style={styles.checkButtonWrapper}>
+            <Button title="Comprobar" onPress={handleCheckDesiredList} />
+          </View>
+          <TextArea
+            value={textAreaValue}
+            onChangeText={setTextAreaValue}
+            onKeyPress={handleTextAreaKeyPress}
+            placeholder="e.g. 3x Card A&#10;2x Card B"
+            style={styles.mobileTextArea}
+          />
         </ScrollView>
-      </View>
-
-      <View style={styles.column}>
-        <Text style={styles.columnTitle}>Cartas que tienes</Text>
-        <ScrollView style={styles.scroll}>
-          {cardsYouHave.length === 0 ? (
-            <Text style={styles.empty}>No hay cartas</Text>
-          ) : (
-            cardsYouHave.map((item, i) => (
-              <View key={`${item.name}-${item.tag ?? ""}-${i}`} style={styles.cardRow}>
-                <Text style={styles.cardName}>
-                  {item.quantity}x {item.name}
-                </Text>
-              </View>
-            ))
-          )}
-        </ScrollView>
-      </View>
-      <View style={styles.column}>
-        <Text style={styles.columnTitle}>Cartas que faltan</Text>
-        <ScrollView style={styles.scroll}>
-          {cardsMissing.length === 0 ? (
-            <Text style={styles.empty}>No hay cartas</Text>
-          ) : (
-            cardsMissing.map((item, i) => (
-              <View key={`${item.name}-${item.tag ?? ""}-${i}`} style={styles.cardRow}>
-                <Text style={styles.cardName}>
-                  {item.quantity}x {item.name}
-                </Text>
-              </View>
-            ))
-          )}
-        </ScrollView>
-      </View>
-      <View style={styles.column}>
-        <Text style={styles.columnTitle}>Lista deseada</Text>
-        <TextArea
-          value={desiredListText}
-          onChangeText={setDesiredListText}
-          placeholder="e.g. 3x Card A&#10;2x Card B"
-        />
-      </View>
+      ) : (
+        <View style={styles.column}>
+          <Text style={styles.columnTitle}>Lista deseada</Text>
+          <View style={styles.checkButtonWrapper}>
+            <Button title="Comprobar" onPress={handleCheckDesiredList} />
+          </View>
+          <TextArea
+            value={textAreaValue}
+            onChangeText={setTextAreaValue}
+            onKeyPress={handleTextAreaKeyPress}
+            placeholder="e.g. 3x Card A&#10;2x Card B"
+          />
+        </View>
+      )}
     </View>
   );
 }
@@ -269,14 +400,45 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: "row",
   },
+  containerMobile: {
+    flexDirection: "column",
+    overflow: "scroll",
+  },
   column: {
     flex: 1,
     padding: 8,
     borderRightWidth: 1,
     borderRightColor: "#eee",
   },
+  columnMobileTop: {
+    flex: 0,
+    minHeight: "50%",
+    borderRightWidth: 0,
+    borderBottomWidth: 1,
+    borderBottomColor: "#ddd",
+  },
+  columnMobileBottom: {
+    flex: 0,
+    minHeight: "50%",
+    borderRightWidth: 0,
+  },
+  columnMobileResults: {
+    minHeight: "20%",
+    borderRightWidth: 0,
+    borderBottomWidth: 1,
+    borderBottomColor: "#ddd",
+    paddingVertical: 4,
+  },
+  mobileTextArea: {
+    flex: 1,
+    minHeight: undefined,
+  },
+  checkButtonWrapper: {
+    marginBottom: 5,
+  },
   columnTitle: { fontWeight: "bold", marginBottom: 8 },
   scroll: { flex: 1 },
+  scrollMobile: { maxHeight: 225 },
   empty: { color: "#666", padding: 8 },
   invRow: {
     flexDirection: "row",
@@ -290,6 +452,7 @@ const styles = StyleSheet.create({
   invMatch: { color: "#d32f2f", fontWeight: "bold" },
   listsPanel: { marginTop: 12 },
   listsTitle: { fontWeight: "600", marginBottom: 6 },
+  listsHeaderButton: { paddingVertical: 4 },
   listsGridWrapper: { marginBottom: 8 },
   grid: {
     flexDirection: "row",
@@ -351,5 +514,34 @@ const styles = StyleSheet.create({
     color: "#333",
     marginLeft: 8,
     marginVertical: 2,
+  },
+  checkboxContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 5,
+    marginBottom: 5,
+  },
+  checkbox: {
+    width: 18,
+    height: 18,
+    borderWidth: 1,
+    borderColor: "#999",
+    borderRadius: 3,
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 8,
+  },
+  checkboxChecked: {
+    backgroundColor: "#4CAF50",
+    borderColor: "#4CAF50",
+  },
+  checkboxCheck: {
+    color: "#fff",
+    fontSize: 14,
+    fontWeight: "bold",
+  },
+  checkboxText: {
+    fontSize: 13,
+    flex: 1,
   },
 });

@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useEffect, useCallback } from "react";
-import { View, StyleSheet, Alert } from "react-native";
+import { View, StyleSheet, Alert, useWindowDimensions, ScrollView } from "react-native";
 import type { Inventory } from "../../models/Inventory";
 import type { Item } from "../../models/Item";
 import type { InventoryService } from "../../services/inventoryService";
@@ -26,11 +26,17 @@ export function InventoryScreen({
   inventoryService,
   refreshTrigger,
 }: InventoryScreenProps): React.JSX.Element {
+  const { width } = useWindowDimensions();
+  const isMobile = width < 768;
+  
   const [inventory, setInventory] = useState<Inventory>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [changeListText, setChangeListText] = useState("");
   const [addedItems, setAddedItems] = useState<Item[]>([]);
   const [removedItems, setRemovedItems] = useState<Item[]>([]);
+  
+  // Check if there are actual changes (added/removed items)
+  const hasChanges = addedItems.length > 0 || removedItems.length > 0;
 
   const loadInventory = useCallback(async () => {
     const data = await inventoryService.loadInventory();
@@ -110,8 +116,8 @@ export function InventoryScreen({
   );
 
   return (
-    <View style={styles.container}>
-      <View style={styles.column}>
+    <View style={[styles.container, isMobile && styles.containerMobile]}>
+      <View style={[styles.column, isMobile && styles.columnMobile]}>
         <InventoryView
           inventory={inventory}
           searchQuery={searchQuery}
@@ -119,20 +125,40 @@ export function InventoryScreen({
           onImportFile={handleImportFile}
         />
       </View>
-      <View style={styles.column}>
-        <ChangeSummary
-          addedItems={addedItems}
-          removedItems={removedItems}
-        />
-      </View>
-      <View style={styles.column}>
-        <ChangeListPanel
-          changeListText={changeListText}
-          onChangeListText={setChangeListText}
-          onAdd={handleApply}
-          onRemove={handleRemove}
-        />
-      </View>
+      {!isMobile && (
+        <View style={styles.column}>
+          <ChangeSummary
+            addedItems={addedItems}
+            removedItems={removedItems}
+          />
+        </View>
+      )}
+      {!isMobile ? (
+        <View style={styles.column}>
+          <ChangeListPanel
+            changeListText={changeListText}
+            onChangeListText={setChangeListText}
+            onAdd={handleApply}
+            onRemove={handleRemove}
+          />
+        </View>
+      ) : (
+        <ScrollView style={[styles.column, styles.mobileChangePanel]}>
+          {hasChanges && (
+            <ChangeSummary
+              addedItems={addedItems}
+              removedItems={removedItems}
+            />
+          )}
+          <ChangeListPanel
+            changeListText={changeListText}
+            onChangeListText={setChangeListText}
+            onAdd={handleApply}
+            onRemove={handleRemove}
+            isMobile={true}
+          />
+        </ScrollView>
+      )}
     </View>
   );
 }
@@ -142,7 +168,18 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: "row",
   },
+  containerMobile: {
+    flexDirection: "column",
+  },
   column: {
     flex: 1,
+  },
+  columnMobile: {
+    flex: 0.6,
+  },
+  mobileChangePanel: {
+    flex: 0.4,
+    borderTopWidth: 1,
+    borderTopColor: "#ddd",
   },
 });

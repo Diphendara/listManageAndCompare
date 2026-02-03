@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useEffect, useCallback, useRef } from "react";
-import { View, StyleSheet, Alert, TextInput, Pressable, Text } from "react-native";
+import { View, StyleSheet, Alert, TextInput, Pressable, Text, useWindowDimensions, ScrollView } from "react-native";
 import type { CustomList, ListItem } from "../../models/CustomList";
 import type { CustomListsService } from "../../services/customListsService";
 import { parseListText } from "../../parsers/listItemParser";
@@ -23,11 +23,15 @@ export function CustomListsScreen({
   customListsService,
   refreshTrigger,
 }: CustomListsScreenProps): React.JSX.Element {
+  const { width } = useWindowDimensions();
+  const isMobile = width < 768;
+  
   const [lists, setLists] = useState<CustomList[]>([]);
   const [selectedListName, setSelectedListName] = useState<string | null>(null);
   const [selectedListEditName, setSelectedListEditName] = useState<string>("");
   const [editorText, setEditorText] = useState("");
   const [loading, setLoading] = useState(false);
+  const [updateMessage, setUpdateMessage] = useState<string | null>(null);
   const [expandedDeleteListName, setExpandedDeleteListName] = useState<string | null>(null);
   const [showCreateInput, setShowCreateInput] = useState(false);
   const [createName, setCreateName] = useState("");
@@ -64,6 +68,7 @@ export function CustomListsScreen({
   const handleSelectList = useCallback((listName: string) => {
     setSelectedListName(listName);
     setSelectedListEditName(listName);
+    setUpdateMessage(null);
     const list = lists.find((l) => l.name === listName);
     if (list) {
       // Format decklist back to text
@@ -76,6 +81,7 @@ export function CustomListsScreen({
     // Open inline input for list name
     setCreateName("");
     setShowCreateInput(true);
+    setUpdateMessage(null);
   }, [lists, editorText, customListsService]);
 
   const handleConfirmCreate = useCallback(async () => {
@@ -172,9 +178,10 @@ export function CustomListsScreen({
       // Update local lists in place
       const newLists = lists.map((l) => (l.name === selectedListName ? updatedList : l));
       setLists(newLists);
-      setSelectedListName(newName);
-      setSelectedListEditName(newName);
-      Alert.alert("✓ Éxito", `Lista "${updatedList.name}" actualizada`);
+      setSelectedListName(null);
+      setSelectedListEditName("");
+      setEditorText("");
+      setUpdateMessage(`Lista "${updatedList.name}" actualizada`);
     } catch (err) {
       Alert.alert(
         "❌ Error",
@@ -237,8 +244,8 @@ export function CustomListsScreen({
   );
 
   return (
-    <View style={styles.container}>
-      <View style={styles.column}>
+    <View style={[styles.container, isMobile && styles.containerMobile]}>
+      <View style={[styles.column, isMobile && styles.columnMobileTop]}>
         <ListCards
           lists={lists}
           selectedListName={selectedListName}
@@ -250,43 +257,84 @@ export function CustomListsScreen({
           loading={loading}
         />
       </View>
-      <View style={styles.column}>
-        <ListPreview selectedList={selectedList} />
-      </View>
-      <View style={styles.column}>
-        {showCreateInput && (
-          <Card>
-            <Text style={styles.cardTitle}>Crear nueva lista</Text>
-            <TextInput
-              ref={createNameInputRef}
-              style={styles.createInput}
-              placeholder="Nombre de la lista"
-              value={createName}
-              onChangeText={setCreateName}
-              editable={!loading}
-            />
-            <View style={styles.createActions}>
-              <Pressable style={styles.createCancel} onPress={handleCancelCreate} disabled={loading}>
-                <Text style={styles.createActionText}>Cancelar</Text>
-              </Pressable>
-              <Pressable style={styles.createConfirm} onPress={handleConfirmCreate} disabled={loading}>
-                <Text style={styles.createActionText}>{loading ? "Creando..." : "Crear"}</Text>
-              </Pressable>
-            </View>
-          </Card>
-        )}
+      {!isMobile && (
+        <View style={styles.column}>
+          <ListPreview selectedList={selectedList} />
+        </View>
+      )}
+      {isMobile ? (
+        <ScrollView style={[styles.column, styles.columnMobileBottom]}>
+          {showCreateInput && (
+            <Card>
+              <Text style={styles.cardTitle}>Crear nueva lista</Text>
+              <TextInput
+                ref={createNameInputRef}
+                style={styles.createInput}
+                placeholder="Nombre de la lista"
+                value={createName}
+                onChangeText={setCreateName}
+                editable={!loading}
+              />
+              <View style={styles.createActions}>
+                <Pressable style={styles.createCancel} onPress={handleCancelCreate} disabled={loading}>
+                  <Text style={styles.createActionText}>Cancelar</Text>
+                </Pressable>
+                <Pressable style={styles.createConfirm} onPress={handleConfirmCreate} disabled={loading}>
+                  <Text style={styles.createActionText}>{loading ? "Creando..." : "Crear"}</Text>
+                </Pressable>
+              </View>
+            </Card>
+          )}
 
-        <ListEditor
-          editorText={editorText}
-          onEditorTextChange={setEditorText}
-          onCreateList={handleCreateList}
-          onUpdateList={handleUpdateList}
-          hasSelectedList={selectedList !== null}
-          listName={selectedListEditName}
-          onListNameChange={setSelectedListEditName}
-          onListNameSubmit={handleUpdateList}
-        />
-      </View>
+          <ListEditor
+            editorText={editorText}
+            onEditorTextChange={setEditorText}
+            onCreateList={handleCreateList}
+            onUpdateList={handleUpdateList}
+            hasSelectedList={selectedList !== null}
+            listName={selectedListEditName}
+            onListNameChange={setSelectedListEditName}
+            onListNameSubmit={handleUpdateList}
+            updateMessage={updateMessage}
+          />
+        </ScrollView>
+      ) : (
+        <View style={styles.column}>
+          {showCreateInput && (
+            <Card>
+              <Text style={styles.cardTitle}>Crear nueva lista</Text>
+              <TextInput
+                ref={createNameInputRef}
+                style={styles.createInput}
+                placeholder="Nombre de la lista"
+                value={createName}
+                onChangeText={setCreateName}
+                editable={!loading}
+              />
+              <View style={styles.createActions}>
+                <Pressable style={styles.createCancel} onPress={handleCancelCreate} disabled={loading}>
+                  <Text style={styles.createActionText}>Cancelar</Text>
+                </Pressable>
+                <Pressable style={styles.createConfirm} onPress={handleConfirmCreate} disabled={loading}>
+                  <Text style={styles.createActionText}>{loading ? "Creando..." : "Crear"}</Text>
+                </Pressable>
+              </View>
+            </Card>
+          )}
+
+          <ListEditor
+            editorText={editorText}
+            onEditorTextChange={setEditorText}
+            onCreateList={handleCreateList}
+            onUpdateList={handleUpdateList}
+            hasSelectedList={selectedList !== null}
+            listName={selectedListEditName}
+            onListNameChange={setSelectedListEditName}
+            onListNameSubmit={handleUpdateList}
+            updateMessage={updateMessage}
+          />
+        </View>
+      )}
     </View>
   );
 }
@@ -296,8 +344,19 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: "row",
   },
+  containerMobile: {
+    flexDirection: "column",
+  },
   column: {
     flex: 1,
+  },
+  columnMobileTop: {
+    flex: 0.5,
+    borderBottomWidth: 1,
+    borderBottomColor: "#ddd",
+  },
+  columnMobileBottom: {
+    flex: 0.5,
   },
   cardTitle: { fontWeight: "bold", marginBottom: 8 },
   createInput: {

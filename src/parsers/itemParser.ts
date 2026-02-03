@@ -45,8 +45,8 @@ export function parseLine(line: string): ParseLineResult | { ok: true; empty: tr
   }
 
   const quantity = parseInt(match[1], 10);
-  const name = match[2].trim();
-  const tag = match[3] ?? undefined;
+  const name = match[2].trim().toLowerCase();
+  const tag = match[3]?.toLowerCase() ?? undefined;
 
   if (name === "") {
     return { ok: false, error: "Invalid format" };
