@@ -4,7 +4,7 @@
  */
 
 import React from "react";
-import { View, Text, StyleSheet } from "react-native";
+import { View, Text, StyleSheet, TextInput } from "react-native";
 import { TextArea } from "../../components/TextArea";
 import { Button } from "../../components/Button";
 
@@ -16,6 +16,7 @@ export interface ListEditorProps {
   hasSelectedList: boolean;
   listName?: string;
   onListNameChange?: (v: string) => void;
+  onListNameSubmit?: () => void;
 }
 
 export function ListEditor({
@@ -26,6 +27,7 @@ export function ListEditor({
   hasSelectedList,
   listName,
   onListNameChange,
+  onListNameSubmit,
 }: ListEditorProps): React.JSX.Element {
   return (
     <View style={styles.column}>
@@ -35,7 +37,9 @@ export function ListEditor({
           style={styles.nameInput}
           value={listName}
           onChangeText={onListNameChange}
+          onSubmitEditing={onListNameSubmit}
           placeholder="Nombre de la lista"
+          returnKeyType="done"
         />
       )}
       <TextArea

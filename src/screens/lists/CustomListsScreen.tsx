@@ -3,7 +3,7 @@
  * Left: List cards (clickable) | Center: List preview | Right: List editor.
  */
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { View, StyleSheet, Alert, TextInput, Pressable, Text } from "react-native";
 import type { CustomList, ListItem } from "../../models/CustomList";
 import type { CustomListsService } from "../../services/customListsService";
@@ -31,6 +31,7 @@ export function CustomListsScreen({
   const [expandedDeleteListName, setExpandedDeleteListName] = useState<string | null>(null);
   const [showCreateInput, setShowCreateInput] = useState(false);
   const [createName, setCreateName] = useState("");
+  const createNameInputRef = useRef<TextInput | null>(null);
 
   // Load lists on mount and when refreshTrigger changes
   useEffect(() => {
@@ -47,6 +48,16 @@ export function CustomListsScreen({
     }
     loadLists();
   }, [customListsService, refreshTrigger]);
+
+  useEffect(() => {
+    if (showCreateInput) {
+      const id = setTimeout(() => {
+        createNameInputRef.current?.focus();
+      }, 0);
+      return () => clearTimeout(id);
+    }
+    return undefined;
+  }, [showCreateInput]);
 
   const selectedList = lists.find((l) => l.name === selectedListName) || null;
 
@@ -208,6 +219,7 @@ export function CustomListsScreen({
         setLists(lists.filter((l) => l.name !== listName));
         if (selectedListName === listName) {
           setSelectedListName(null);
+          setSelectedListEditName("");
           setEditorText("");
         }
         setExpandedDeleteListName(null);
@@ -246,6 +258,7 @@ export function CustomListsScreen({
           <Card>
             <Text style={styles.cardTitle}>Crear nueva lista</Text>
             <TextInput
+              ref={createNameInputRef}
               style={styles.createInput}
               placeholder="Nombre de la lista"
               value={createName}
@@ -269,6 +282,9 @@ export function CustomListsScreen({
           onCreateList={handleCreateList}
           onUpdateList={handleUpdateList}
           hasSelectedList={selectedList !== null}
+          listName={selectedListEditName}
+          onListNameChange={setSelectedListEditName}
+          onListNameSubmit={handleUpdateList}
         />
       </View>
     </View>

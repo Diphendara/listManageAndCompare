@@ -14,8 +14,11 @@ import {
 import type { InventoryService } from "../../services/inventoryService";
 import type { CustomListsService } from "../../services/customListsService";
 import { SearchBar } from "../../components/SearchBar";
+import { TextArea } from "../../components/TextArea";
+import { parseText } from "../../parsers/itemParser";
 import type { Inventory } from "../../models/Inventory";
 import type { CustomList } from "../../models/CustomList";
+import type { Item } from "../../models/Item";
 
 export interface ComparisonsScreenProps {
   inventoryService?: InventoryService;
@@ -35,6 +38,7 @@ export function ComparisonsScreen({
   const [inventory, setInventory] = useState<Inventory>([]);
   const [lists, setLists] = useState<CustomList[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
+  const [desiredListText, setDesiredListText] = useState("");
 
   const loadInventory = useCallback(async () => {
     if (!inventoryService) return;
@@ -69,6 +73,48 @@ export function ComparisonsScreen({
   const filteredInventory = groupedInventory.filter((it) =>
     it.name.toLowerCase().includes(searchQuery.trim().toLowerCase())
   );
+
+  // Sum quantities by name across ALL saved lists (regardless of inUse)
+  const listTotalsByName = React.useMemo(() => {
+    const totals = new Map<string, number>();
+    for (const list of lists) {
+      for (const item of list.decklist) {
+        const key = item.name.trim().toLowerCase();
+        totals.set(key, (totals.get(key) ?? 0) + item.quantity);
+      }
+    }
+    return totals;
+  }, [lists]);
+
+  // Parse desired list and compute have/missing
+  const { cardsYouHave, cardsMissing } = React.useMemo(() => {
+    const result = parseText(desiredListText);
+    const have: Array<Item & { inInventory: number }> = [];
+    const missing: Array<Item & { inInventory: number }> = [];
+
+    if (result.ok) {
+      for (const item of result.items) {
+        const key = item.name.trim().toLowerCase();
+        const inInventory = groupedInventory.find(
+          (it) => it.name.trim().toLowerCase() === key
+        )?.quantity ?? 0;
+        const listInUse = listTotalsByName.get(key) ?? 0;
+
+        // Available cards = total inventory - cards in use
+        const available = inInventory - listInUse;
+
+        // If desired > available: missing
+        if (item.quantity > available) {
+          missing.push({ ...item, inInventory });
+        }
+        // If desired <= available: have
+        else {
+          have.push({ ...item, inInventory });
+        }
+      }
+    }
+    return { cardsYouHave: have, cardsMissing: missing };
+  }, [desiredListText, groupedInventory, listTotalsByName]);
 
   const handleToggleInUse = async (listName: string, inUse: boolean) => {
     if (!customListsService) return;
@@ -132,24 +178,61 @@ export function ComparisonsScreen({
           {filteredInventory.length === 0 ? (
             <Text style={styles.empty}>No hay items</Text>
           ) : (
-            filteredInventory.map((it) => (
-              <View key={it.name} style={styles.invRow}>
-                <Text style={styles.invName}>{it.name}</Text>
-                <Text style={styles.invQty}>{it.quantity}</Text>
-              </View>
-            ))
+            filteredInventory.map((it) => {
+              const listTotal = listTotalsByName.get(it.name.trim().toLowerCase()) ?? 0;
+              const isMatch = listTotal === it.quantity;
+              return (
+                <View key={it.name} style={styles.invRow}>
+                  <Text style={[styles.invName, isMatch && styles.invMatch]}>{it.name}</Text>
+                  <Text style={[styles.invQty, isMatch && styles.invMatch]}>
+                    {listTotal}/{it.quantity}
+                  </Text>
+                </View>
+              );
+            })
           )}
         </ScrollView>
       </View>
 
       <View style={styles.column}>
         <Text style={styles.columnTitle}>Cartas que tienes</Text>
+        <ScrollView style={styles.scroll}>
+          {cardsYouHave.length === 0 ? (
+            <Text style={styles.empty}>No hay cartas</Text>
+          ) : (
+            cardsYouHave.map((item, i) => (
+              <View key={`${item.name}-${item.tag ?? ""}-${i}`} style={styles.cardRow}>
+                <Text style={styles.cardName}>
+                  {item.quantity}x {item.name}
+                </Text>
+              </View>
+            ))
+          )}
+        </ScrollView>
       </View>
       <View style={styles.column}>
         <Text style={styles.columnTitle}>Cartas que faltan</Text>
+        <ScrollView style={styles.scroll}>
+          {cardsMissing.length === 0 ? (
+            <Text style={styles.empty}>No hay cartas</Text>
+          ) : (
+            cardsMissing.map((item, i) => (
+              <View key={`${item.name}-${item.tag ?? ""}-${i}`} style={styles.cardRow}>
+                <Text style={styles.cardName}>
+                  {item.quantity}x {item.name}
+                </Text>
+              </View>
+            ))
+          )}
+        </ScrollView>
       </View>
       <View style={styles.column}>
         <Text style={styles.columnTitle}>Lista deseada</Text>
+        <TextArea
+          value={desiredListText}
+          onChangeText={setDesiredListText}
+          placeholder="e.g. 3x Card A&#10;2x Card B"
+        />
       </View>
     </View>
   );
@@ -178,6 +261,7 @@ const styles = StyleSheet.create({
   },
   invName: { fontSize: 13 },
   invQty: { fontSize: 13, color: "#333" },
+  invMatch: { color: "#d32f2f", fontWeight: "bold" },
   listsPanel: { marginTop: 12 },
   listsTitle: { fontWeight: "600", marginBottom: 6 },
   listsGridWrapper: { marginBottom: 8 },
@@ -216,4 +300,11 @@ const styles = StyleSheet.create({
     borderColor: "#4CAF50",
   },
   checkboxLabelText: { color: "#fff", fontWeight: "bold", fontSize: 10 },
+  cardRow: {
+    paddingVertical: 6,
+    borderBottomWidth: 1,
+    borderBottomColor: "#fafafa",
+  },
+  cardName: { fontSize: 13, fontWeight: "500" },
+  cardMissing: { fontSize: 12, color: "#d32f2f", marginTop: 2 },
 });
