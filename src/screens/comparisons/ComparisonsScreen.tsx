@@ -39,6 +39,7 @@ export function ComparisonsScreen({
   const [lists, setLists] = useState<CustomList[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [desiredListText, setDesiredListText] = useState("");
+  const [expandedItem, setExpandedItem] = useState<string | null>(null);
 
   const loadInventory = useCallback(async () => {
     if (!inventoryService) return;
@@ -181,12 +182,37 @@ export function ComparisonsScreen({
             filteredInventory.map((it) => {
               const listTotal = listTotalsByName.get(it.name.trim().toLowerCase()) ?? 0;
               const isMatch = listTotal === it.quantity;
+              const key = it.name.trim().toLowerCase();
+              const isExpanded = expandedItem === key;
+              
+              // Find lists that contain this item and are inUse
+              const listsWithItem = lists.filter((list) => {
+                return list.inUse && list.decklist.some(
+                  (item) => item.name.trim().toLowerCase() === key
+                );
+              });
+              
               return (
-                <View key={it.name} style={styles.invRow}>
-                  <Text style={[styles.invName, isMatch && styles.invMatch]}>{it.name}</Text>
-                  <Text style={[styles.invQty, isMatch && styles.invMatch]}>
-                    {listTotal}/{it.quantity}
-                  </Text>
+                <View key={it.name}>
+                  <Pressable
+                    style={styles.invRow}
+                    onPress={() => setExpandedItem(isExpanded ? null : key)}
+                  >
+                    <Text style={[styles.invName, isMatch && styles.invMatch]}>{it.name}</Text>
+                    <Text style={[styles.invQty, isMatch && styles.invMatch]}>
+                      {listTotal}/{it.quantity}
+                    </Text>
+                  </Pressable>
+                  {isExpanded && listsWithItem.length > 0 && (
+                    <View style={styles.expandedSection}>
+                      <Text style={styles.expandedTitle}>En uso en:</Text>
+                      {listsWithItem.map((list) => (
+                        <Text key={list.name} style={styles.expandedListName}>
+                          • {list.name}
+                        </Text>
+                      ))}
+                    </View>
+                  )}
                 </View>
               );
             })
@@ -307,4 +333,23 @@ const styles = StyleSheet.create({
   },
   cardName: { fontSize: 13, fontWeight: "500" },
   cardMissing: { fontSize: 12, color: "#d32f2f", marginTop: 2 },
+  expandedSection: {
+    paddingLeft: 16,
+    paddingVertical: 6,
+    backgroundColor: "#f5f5f5",
+    borderBottomWidth: 1,
+    borderBottomColor: "#e0e0e0",
+  },
+  expandedTitle: {
+    fontSize: 11,
+    fontWeight: "600",
+    color: "#666",
+    marginBottom: 4,
+  },
+  expandedListName: {
+    fontSize: 11,
+    color: "#333",
+    marginLeft: 8,
+    marginVertical: 2,
+  },
 });
