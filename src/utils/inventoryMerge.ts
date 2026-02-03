@@ -7,8 +7,8 @@ import type { Item } from "../models/Item";
 import type { Inventory } from "../models/Inventory";
 
 function key(item: Item): string {
-  const tag = item.tag ?? "";
-  return `${item.name}|${tag}`;
+  const tag = (item.tag ?? "").toLowerCase();
+  return `${item.name.toLowerCase()}|${tag}`;
 }
 
 /** Returns a new inventory with items merged (add quantity by name+tag, else append). */
@@ -17,8 +17,14 @@ export function mergeItemsIntoInventory(
   toAdd: Item[]
 ): Inventory {
   const byKey = new Map<string, Item>();
+  // Normalize existing inventory items to lowercase
   for (const item of inventory) {
-    byKey.set(key(item), { ...item });
+    const normalized = {
+      ...item,
+      name: item.name.toLowerCase(),
+      tag: item.tag?.toLowerCase(),
+    };
+    byKey.set(key(normalized), normalized);
   }
   for (const item of toAdd) {
     const k = key(item);

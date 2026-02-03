@@ -1,11 +1,13 @@
 import React from "react";
-import { TextInput, StyleSheet } from "react-native";
+import { TextInput, StyleSheet, type TextInputProps } from "react-native";
 
 export interface TextAreaProps {
   value: string;
   onChangeText: (value: string) => void;
   placeholder?: string;
   style?: any;
+  onPaste?: () => void;
+  onKeyPress?: TextInputProps["onKeyPress"];
 }
 
 export function TextArea({
@@ -13,6 +15,8 @@ export function TextArea({
   onChangeText,
   placeholder,
   style,
+  onPaste,
+  onKeyPress,
 }: TextAreaProps): React.JSX.Element {
   return (
     <TextInput
@@ -21,6 +25,8 @@ export function TextArea({
       onChangeText={onChangeText}
       placeholder={placeholder}
       multiline
+      onPaste={onPaste}
+      onKeyPress={onKeyPress}
     />
   );
 }
