@@ -5,16 +5,18 @@ export interface TextAreaProps {
   value: string;
   onChangeText: (value: string) => void;
   placeholder?: string;
+  style?: any;
 }
 
 export function TextArea({
   value,
   onChangeText,
   placeholder,
+  style,
 }: TextAreaProps): React.JSX.Element {
   return (
     <TextInput
-      style={styles.input}
+      style={[styles.input, style]}
       value={value}
       onChangeText={onChangeText}
       placeholder={placeholder}
