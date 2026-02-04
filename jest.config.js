@@ -1,12 +1,20 @@
 module.exports = {
-  preset: 'jest-expo',
+  testEnvironment: 'node',
+  preset: 'ts-jest',
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json'],
   roots: ['<rootDir>/src', '<rootDir>/__tests__'],
-  setupFiles: ['<rootDir>/jest.setup.js'],
+  testPathIgnorePatterns: ['/node_modules/'],
   moduleNameMapper: {
-    '^react-native/Libraries/BatchedBridge/NativeModules$': '<rootDir>/__mocks__/NativeModules.js',
+    '^@/(.*)$': '<rootDir>/src/$1',
   },
-  transformIgnorePatterns: [
-    'node_modules/(?!((jest-)?react-native|@react-native|expo|expo-.*|@expo/.*|react-native-web)/)',
+  globals: {
+    'ts-jest': {
+      tsconfig: '<rootDir>/tsconfig.jest.json',
+    },
+  },
+  collectCoverageFrom: [
+    'src/**/*.{ts,tsx}',
+    '!src/**/*.d.ts',
+    '!src/app/**',
   ],
 };

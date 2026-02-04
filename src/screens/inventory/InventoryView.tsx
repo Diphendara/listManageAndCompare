@@ -7,7 +7,7 @@ import { View, Text, ScrollView, StyleSheet, Pressable } from "react-native";
 import { SearchBar } from "../../components/SearchBar";
 import { Card } from "../../components/Card";
 import { Button } from "../../components/Button";
-import { FileImportButton } from "../../components/FileImportButton";
+import { MultiFileImportButton } from "../../components/MultiFileImportButton";
 import { formatItem } from "../../utils/itemFormat";
 import type { Inventory } from "../../models/Inventory";
 
@@ -59,9 +59,14 @@ export function InventoryView({
 
   return (
     <View style={styles.column}>
-      <FileImportButton
+      <MultiFileImportButton
         title="Cargar inventario desde dispositivo"
-        onFileRead={onImportFile}
+        onFilesRead={(files) => {
+          if (files.length > 0) {
+            onImportFile(files[0].content);
+          }
+        }}
+        accept=".json"
       />
       <View style={styles.buttonSpacing}>
         <Button
