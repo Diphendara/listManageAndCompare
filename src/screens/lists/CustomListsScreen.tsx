@@ -36,6 +36,7 @@ export function CustomListsScreen({
   const [showCreateInput, setShowCreateInput] = useState(false);
   const [createName, setCreateName] = useState("");
   const [showDownloadDialog, setShowDownloadDialog] = useState(false);
+  const [importMessage, setImportMessage] = useState<string | null>(null);
   const createNameInputRef = useRef<TextInput | null>(null);
 
   // Load lists on mount and when refreshTrigger changes
@@ -307,6 +308,96 @@ export function CustomListsScreen({
     }
   }, [lists]);
 
+  const handleImportLists = useCallback(
+    async (files: Array<{ name: string; content: string }>) => {
+      // Clear previous message
+      setImportMessage(null);
+      
+      let successCount = 0;
+      let errorCount = 0;
+      const errors: string[] = [];
+      const importedNames = new Set<string>(); // Track names imported in this batch
+
+      for (const file of files) {
+        try {
+          const fileName = file.name;
+          const extension = fileName.substring(fileName.lastIndexOf(".")).toLowerCase();
+          let listNameFromFile = fileName.substring(0, fileName.lastIndexOf("."));
+
+          let customList: CustomList;
+
+          if (extension === ".json") {
+            // Parse JSON first to get the real name
+            const parsed = JSON.parse(file.content);
+            customList = parsed as CustomList;
+            
+            // Use the name from JSON content, not filename
+            if (!customList.name) {
+              errors.push(`"${fileName}": JSON sin campo "name"`);
+              errorCount++;
+              continue;
+            }
+          } else if (extension === ".txt") {
+            // Parse TXT format (quantity x name)
+            const result = parseListText(file.content);
+            if (!result.ok) {
+              errors.push(`"${fileName}": ${result.error}`);
+              errorCount++;
+              continue;
+            }
+            customList = {
+              name: listNameFromFile,
+              decklist: result.items,
+              inUse: false,
+            };
+          } else {
+            errors.push(`"${fileName}": formato no soportado`);
+            errorCount++;
+            continue;
+          }
+
+          // Check if list already exists in current lists
+          if (lists.some((l) => l.name === customList.name)) {
+            errors.push(`"${customList.name}" ya existe (archivo: ${fileName})`);
+            errorCount++;
+            continue;
+          }
+
+          // Check if already imported in this batch
+          if (importedNames.has(customList.name)) {
+            errors.push(`"${customList.name}" duplicado en archivos importados (archivo: ${fileName})`);
+            errorCount++;
+            continue;
+          }
+
+          // Save the list
+          await customListsService.saveList(customList);
+          importedNames.add(customList.name);
+          successCount++;
+        } catch (err) {
+          errors.push(`"${file.name}": ${err instanceof Error ? err.message : "error desconocido"}`);
+          errorCount++;
+        }
+      }
+
+      // Reload lists
+      const loadedLists = await customListsService.getAllLists();
+      setLists(loadedLists);
+
+      // Show result
+      const message = [
+        successCount > 0 ? `✓ ${successCount} lista(s) importada(s)` : "",
+        errorCount > 0 ? `✖ ${errorCount} error(es)` : "",
+        errors.length > 0 ? `\n${errors.join("\n")}` : "",
+      ]
+        .filter(Boolean)
+        .join("\n");
+
+      setImportMessage(message);
+    },
+    [lists, customListsService]
+  );
+
   return (
     <View style={[styles.container, isMobile && styles.containerMobile]}>
       <View style={[styles.column, isMobile && styles.columnMobileTop]}>
@@ -324,6 +415,8 @@ export function CustomListsScreen({
           onDownloadJSON={handleDownloadJSON}
           onDownloadTXT={handleDownloadTXT}
           onCancelDownload={() => setShowDownloadDialog(false)}
+          onImportLists={handleImportLists}
+          importMessage={importMessage}
         />
       </View>
       {!isMobile && (

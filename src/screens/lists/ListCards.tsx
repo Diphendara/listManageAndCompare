@@ -8,6 +8,7 @@ import { View, Text, ScrollView, StyleSheet, Pressable, Alert, useWindowDimensio
 import type { CustomList } from "../../models/CustomList";
 import { Card } from "../../components/Card";
 import { Button } from "../../components/Button";
+import { MultiFileImportButton } from "../../components/MultiFileImportButton";
 
 export interface ListCardsProps {
   lists: CustomList[];
@@ -23,6 +24,8 @@ export interface ListCardsProps {
   onDownloadJSON: () => void;
   onDownloadTXT: () => void;
   onCancelDownload: () => void;
+  onImportLists: (files: Array<{ name: string; content: string }>) => void;
+  importMessage: string | null;
 }
 
 export function ListCards({
@@ -39,6 +42,8 @@ export function ListCards({
   onDownloadJSON,
   onDownloadTXT,
   onCancelDownload,
+  onImportLists,
+  importMessage,
 }: ListCardsProps): React.JSX.Element {
   const { width } = useWindowDimensions();
   const isMobile = width < 768;
@@ -140,6 +145,16 @@ export function ListCards({
           </View>
         )}
       </ScrollView>
+      <View style={styles.importButtonContainer}>
+        <MultiFileImportButton
+          title="Importar listas"
+          onFilesRead={onImportLists}
+          accept=".json,.txt"
+        />
+        {importMessage && (
+          <Text style={styles.importMessage}>{importMessage}</Text>
+        )}
+      </View>
       <View style={styles.downloadButtonContainer}>
         <Button title="Descargar todas" onPress={onDownloadAllLists} />
       </View>
@@ -311,6 +326,19 @@ const styles = StyleSheet.create({
   downloadButtonContainer: {
     paddingTop: 8,
     alignItems: "center",
+  },
+  importButtonContainer: {
+    paddingTop: 8,
+    alignItems: "center",
+  },
+  importMessage: {
+    marginTop: 8,
+    padding: 8,
+    fontSize: 13,
+    color: "#333",
+    backgroundColor: "#f0f0f0",
+    borderRadius: 4,
+    textAlign: "left",
   },
   formatDialogPanel: {
     padding: 12,
