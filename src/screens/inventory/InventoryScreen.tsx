@@ -3,7 +3,7 @@
  * Left: Inventory view + search | Center: Change summary (informational) | Right: Change list (add / remove).
  */
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { View, StyleSheet, Alert, useWindowDimensions, ScrollView, Pressable, Text } from "react-native";
 import type { Inventory } from "../../models/Inventory";
 import type { Item } from "../../models/Item";
@@ -14,6 +14,7 @@ import { removeItemsFromInventory } from "../../utils/inventoryRemove";
 import { importJsonInventory } from "../../utils/jsonImporter";
 import { formatItem } from "../../utils/itemFormat";
 import { InventoryView } from "./InventoryView";
+import type { FileContent } from "../../components/MultiFileImportButton";
 import { ChangeSummary } from "./ChangeSummary";
 import { ChangeListPanel } from "./ChangeListPanel";
 import { Card } from "../../components/Card";
@@ -21,11 +22,13 @@ import { Card } from "../../components/Card";
 export interface InventoryScreenProps {
   inventoryService: InventoryService;
   refreshTrigger?: number;
+  onInventoryQuantityChange?: (total: number) => void;
 }
 
 export function InventoryScreen({
   inventoryService,
   refreshTrigger,
+  onInventoryQuantityChange,
 }: InventoryScreenProps): React.JSX.Element {
   const { width } = useWindowDimensions();
   const isMobile = width < 768;
@@ -36,6 +39,7 @@ export function InventoryScreen({
   const [addedItems, setAddedItems] = useState<Item[]>([]);
   const [removedItems, setRemovedItems] = useState<Item[]>([]);
   const [showExportDialog, setShowExportDialog] = useState(false);
+  const hasInitializedQuantity = useRef(false);
   
   // Check if there are actual changes (added/removed items)
   const hasChanges = addedItems.length > 0 || removedItems.length > 0;
@@ -43,7 +47,13 @@ export function InventoryScreen({
   const loadInventory = useCallback(async () => {
     const data = await inventoryService.loadInventory();
     setInventory(data);
-  }, [inventoryService]);
+
+    if (!hasInitializedQuantity.current && onInventoryQuantityChange) {
+      const total = data.reduce((sum, item) => sum + item.quantity, 0);
+      onInventoryQuantityChange(total);
+      hasInitializedQuantity.current = true;
+    }
+  }, [inventoryService, onInventoryQuantityChange]);
 
   useEffect(() => {
     loadInventory();
@@ -56,10 +66,14 @@ export function InventoryScreen({
     const next = mergeItemsIntoInventory(inventory, result.items);
     await inventoryService.saveInventory(next);
     setInventory(next);
+    if (onInventoryQuantityChange) {
+      const total = next.reduce((sum, item) => sum + item.quantity, 0);
+      onInventoryQuantityChange(total);
+    }
     setChangeListText("");
     setAddedItems(result.items);
     setRemovedItems([]);
-  }, [inventory, changeListText, inventoryService]);
+  }, [inventory, changeListText, inventoryService, onInventoryQuantityChange]);
 
   const handleRemove = useCallback(async () => {
     const result = parseText(changeListText);
@@ -69,6 +83,10 @@ export function InventoryScreen({
     const removeResult = removeItemsFromInventory(inventory, result.items);
     await inventoryService.saveInventory(removeResult.inventory);
     setInventory(removeResult.inventory);
+    if (onInventoryQuantityChange) {
+      const total = removeResult.inventory.reduce((sum, item) => sum + item.quantity, 0);
+      onInventoryQuantityChange(total);
+    }
 
     // Keep only items that were NOT removed (i.e., not found in inventory)
     const remainingText = result.items
@@ -87,26 +105,56 @@ export function InventoryScreen({
     });
     setRemovedItems(removedItemsList);
     setAddedItems([]);
-  }, [inventory, changeListText, inventoryService]);
+  }, [inventory, changeListText, inventoryService, onInventoryQuantityChange]);
 
   const handleImportInventory = useCallback(() => {
     // Reload inventory from the underlying storage (inventory.json or adapter).
     void loadInventory();
   }, [loadInventory]);
 
-  const handleImportFile = useCallback(
-    async (fileContent: string) => {
-      const result = importJsonInventory(fileContent);
-      if (!result.ok) {
-        Alert.alert("Import Error", result.error);
-        return;
+  const handleImportFiles = useCallback(
+    async (files: FileContent[]) => {
+      if (files.length === 0) return;
+
+      let combined: Inventory = [];
+
+      for (const file of files) {
+        const fileName = file.name;
+        const extension = fileName.substring(fileName.lastIndexOf(".")).toLowerCase();
+
+        if (extension === ".json") {
+          const result = importJsonInventory(file.content);
+          if (!result.ok) {
+            Alert.alert("Import Error", `"${fileName}": ${result.error}`);
+            return;
+          }
+          combined = mergeItemsIntoInventory(combined, result.inventory);
+        } else if (extension === ".txt") {
+          const result = parseText(file.content);
+          if (!result.ok) {
+            Alert.alert("Import Error", `"${fileName}": ${result.error}`);
+            return;
+          }
+          if (result.items.length > 0) {
+            combined = mergeItemsIntoInventory(combined, result.items);
+          }
+        } else {
+          Alert.alert("Import Error", `"${fileName}": formato no soportado`);
+          return;
+        }
       }
 
       try {
         // Replace entire inventory with imported data
-        await inventoryService.saveInventory(result.inventory);
-        setInventory(result.inventory);
-        Alert.alert("Success", `Imported ${result.inventory.length} item(s)`);
+        await inventoryService.saveInventory(combined);
+        setInventory(combined);
+        setAddedItems([]);
+        setRemovedItems([]);
+        setChangeListText("");
+        Alert.alert(
+          "Success",
+          `Imported ${combined.length} item(s) from ${files.length} file(s)`
+        );
       } catch (err) {
         Alert.alert(
           "Save Error",
@@ -153,7 +201,7 @@ export function InventoryScreen({
           inventory={inventory}
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}
-          onImportFile={handleImportFile}
+          onImportFiles={handleImportFiles}
           onExportInventory={handleExportInventory}
           showExportDialog={showExportDialog}
           onExportJSON={handleExportJSON}

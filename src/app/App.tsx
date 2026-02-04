@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { View, StyleSheet, Pressable, Text, Modal } from "react-native";
+import { View, StyleSheet, Pressable, Text } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { InventoryScreen } from "../screens/inventory/InventoryScreen";
 import { CustomListsScreen } from "../screens/lists/CustomListsScreen";
@@ -21,6 +21,8 @@ export default function App(): React.JSX.Element {
   const [activeTab, setActiveTab] = useState<TabName>("inventory");
   const [showSettings, setShowSettings] = useState(false);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [inventoryTotalQuantity, setInventoryTotalQuantity] = useState<number | null>(null);
+  const [listsCount, setListsCount] = useState<number | null>(null);
 
   const handleDataChanged = () => {
     // Trigger refresh by incrementing counter
@@ -34,12 +36,16 @@ export default function App(): React.JSX.Element {
       <View style={styles.header}>
         <View style={styles.tabBar}>
           <TabButton
-            title="Inventory"
+            title={
+              inventoryTotalQuantity === null
+                ? "Inventory"
+                : `Inventory (${inventoryTotalQuantity})`
+            }
             isActive={activeTab === "inventory"}
             onPress={() => setActiveTab("inventory")}
           />
           <TabButton
-            title="Lists"
+            title={listsCount === null ? "Lists" : `Lists (${listsCount})`}
             isActive={activeTab === "lists"}
             onPress={() => setActiveTab("lists")}
           />
@@ -59,33 +65,33 @@ export default function App(): React.JSX.Element {
 
       {/* Content */}
       <View style={styles.content}>
-        {activeTab === "inventory" && (
-          <InventoryScreen 
+        <View style={activeTab === "inventory" ? styles.screenVisible : styles.screenHidden}>
+          <InventoryScreen
             inventoryService={inventoryService}
             refreshTrigger={refreshTrigger}
+            onInventoryQuantityChange={setInventoryTotalQuantity}
           />
-        )}
-        {activeTab === "lists" && (
-          <CustomListsScreen 
+        </View>
+        <View style={activeTab === "lists" ? styles.screenVisible : styles.screenHidden}>
+          <CustomListsScreen
             customListsService={customListsService}
             refreshTrigger={refreshTrigger}
+            onListsCountChange={setListsCount}
           />
-        )}
-        {activeTab === "comparisons" && (
+        </View>
+        <View style={activeTab === "comparisons" ? styles.screenVisible : styles.screenHidden}>
           <ComparisonsScreen
             inventoryService={inventoryService}
             customListsService={customListsService}
             refreshTrigger={refreshTrigger}
           />
-        )}
+        </View>
       </View>
 
-      {/* Settings Modal */}
-      <Modal
-        visible={showSettings}
-        animationType="slide"
-        transparent={false}
-        onRequestClose={() => setShowSettings(false)}
+      {/* Settings Overlay (kept mounted to preserve state) */}
+      <View
+        style={showSettings ? styles.settingsOverlayVisible : styles.settingsOverlayHidden}
+        pointerEvents={showSettings ? "auto" : "none"}
       >
         <View style={styles.settingsContainer}>
           <SettingsScreen
@@ -95,7 +101,7 @@ export default function App(): React.JSX.Element {
             onDataChanged={handleDataChanged}
           />
         </View>
-      </Modal>
+      </View>
     </View>
   );
 }
@@ -169,7 +175,27 @@ const styles = StyleSheet.create({
     marginTop: 40,
     backgroundColor: "#f5f5f5",
   },
+  settingsOverlayVisible: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: "#fff",
+    zIndex: 999,
+  },
+  settingsOverlayHidden: {
+    display: "none",
+  },
   content: {
     flex: 1,
+  },
+  screenVisible: {
+    flex: 1,
+    display: "flex",
+  },
+  screenHidden: {
+    flex: 1,
+    display: "none",
   },
 });

@@ -22,6 +22,20 @@ export interface InventoryService {
   saveInventory(inventory: Inventory): Promise<void>;
 }
 
+function sortInventory(inventory: Inventory): Inventory {
+  return [...inventory].sort((a, b) => {
+    const nameA = a.name.toLowerCase();
+    const nameB = b.name.toLowerCase();
+    if (nameA !== nameB) {
+      return nameA.localeCompare(nameB);
+    }
+
+    const tagA = (a.tag ?? "").toLowerCase();
+    const tagB = (b.tag ?? "").toLowerCase();
+    return tagA.localeCompare(tagB);
+  });
+}
+
 /**
  * Creates the inventory service: load from inventory.json, save and create backup on every change (§7).
  * The inventory is synced from the latest backup file for data integrity.
@@ -69,7 +83,8 @@ export function createInventoryService(
       }
 
       // 2. Then update inventory.json with NEW state
-      await storage.writeJson(paths.INVENTORY_FILENAME, inventory);
+      const sorted = sortInventory(inventory);
+      await storage.writeJson(paths.INVENTORY_FILENAME, sorted);
 
       // 3. Clean up old backups (reads settings dynamically to support configuration changes)
       await cleanupOldBackups(storage);

@@ -17,11 +17,13 @@ import { Button } from "../../components/Button";
 export interface CustomListsScreenProps {
   customListsService: CustomListsService;
   refreshTrigger?: number;
+  onListsCountChange?: (count: number) => void;
 }
 
 export function CustomListsScreen({
   customListsService,
   refreshTrigger,
+  onListsCountChange,
 }: CustomListsScreenProps): React.JSX.Element {
   const { width } = useWindowDimensions();
   const isMobile = width < 768;
@@ -54,6 +56,12 @@ export function CustomListsScreen({
     }
     loadLists();
   }, [customListsService, refreshTrigger]);
+
+  useEffect(() => {
+    if (onListsCountChange) {
+      onListsCountChange(lists.length);
+    }
+  }, [lists.length, onListsCountChange]);
 
   useEffect(() => {
     if (showCreateInput) {
