@@ -290,11 +290,12 @@ export function CustomListsScreen({
           expandedDeleteListName={expandedDeleteListName}
           onConfirmDeleteList={handleConfirmDeleteList}
           loading={loading}
+          onDownloadAllLists={handleDownloadAllLists}
         />
       </View>
       {!isMobile && (
         <View style={styles.column}>
-          <ListPreview selectedList={selectedList} onDownloadAllLists={handleDownloadAllLists} />
+          <ListPreview selectedList={selectedList} />
         </View>
       )}
       {isMobile ? (

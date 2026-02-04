@@ -18,6 +18,7 @@ export interface ListCardsProps {
   expandedDeleteListName: string | null;
   onConfirmDeleteList: (listName: string) => void;
   loading: boolean;
+  onDownloadAllLists: () => void;
 }
 
 export function ListCards({
@@ -29,6 +30,7 @@ export function ListCards({
   expandedDeleteListName,
   onConfirmDeleteList,
   loading,
+  onDownloadAllLists,
 }: ListCardsProps): React.JSX.Element {
   const { width } = useWindowDimensions();
   const isMobile = width < 768;
@@ -130,6 +132,9 @@ export function ListCards({
           </View>
         )}
       </ScrollView>
+      <View style={styles.downloadButtonContainer}>
+        <Button title="Descargar todas" onPress={onDownloadAllLists} />
+      </View>
     </View>
   );
 }
@@ -264,5 +269,9 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: "600",
     color: "#333",
+  },
+  downloadButtonContainer: {
+    paddingTop: 8,
+    alignItems: "center",
   },
 });
