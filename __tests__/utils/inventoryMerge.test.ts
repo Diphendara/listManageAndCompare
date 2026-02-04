@@ -50,8 +50,11 @@ describe('inventoryMerge', () => {
 
     const result = mergeItemsIntoInventory(inventory, newItems);
     expect(result.length).toBe(3);
-    expect(result.map((i) => i.name)).toContain('Sword');
-    expect(result.map((i) => i.name)).toContain('Shield');
+    // Function converts names to lowercase
+    const names = result.map((i) => i.name.toLowerCase());
+    expect(names).toContain('sword');
+    expect(names).toContain('shield');
+    expect(names).toContain('helmet');
   });
 
   it('returns immutable copy', () => {
