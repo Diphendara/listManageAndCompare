@@ -243,6 +243,41 @@ export function CustomListsScreen({
     [lists, selectedListName, customListsService]
   );
 
+  const handleDownloadAllLists = useCallback(async () => {
+    if (lists.length === 0) {
+      Alert.alert("Info", "No hay listas para descargar");
+      return;
+    }
+
+    try {
+      // Dynamic import JSZip
+      const JSZip = (await import("jszip")).default;
+      const zip = new JSZip();
+
+      // Add each list as a JSON file
+      lists.forEach((list) => {
+        const jsonString = JSON.stringify(list, null, 2);
+        zip.file(`${list.name}.json`, jsonString);
+      });
+
+      // Generate zip blob
+      const blob = await zip.generateAsync({ type: "blob" });
+      
+      // Create download link
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "all_lists.zip";
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      Alert.alert(
+        "Error",
+        err instanceof Error ? err.message : "No se pudo crear el archivo zip"
+      );
+    }
+  }, [lists]);
+
   return (
     <View style={[styles.container, isMobile && styles.containerMobile]}>
       <View style={[styles.column, isMobile && styles.columnMobileTop]}>
@@ -259,7 +294,7 @@ export function CustomListsScreen({
       </View>
       {!isMobile && (
         <View style={styles.column}>
-          <ListPreview selectedList={selectedList} />
+          <ListPreview selectedList={selectedList} onDownloadAllLists={handleDownloadAllLists} />
         </View>
       )}
       {isMobile ? (

@@ -16,6 +16,7 @@ export interface InventoryViewProps {
   searchQuery: string;
   onSearchChange: (value: string) => void;
   onImportFile: (fileContent: string) => void;
+  onExportInventory: () => void;
 }
 
 function filterInventory(inventory: Inventory, query: string): Inventory {
@@ -44,20 +45,29 @@ export function InventoryView({
   searchQuery,
   onSearchChange,
   onImportFile,
+  onExportInventory,
 }: InventoryViewProps): React.JSX.Element {
   const filtered = filterInventory(inventory, searchQuery);
 
   return (
     <View style={styles.column}>
       <FileImportButton
-        title="Import inventory.json"
+        title="Cargar inventario desde dispositivo"
         onFileRead={onImportFile}
       />
-      <SearchBar
-        value={searchQuery}
-        onChangeText={onSearchChange}
-        placeholder="Search"
-      />
+      <View style={styles.buttonSpacing}>
+        <Button
+          title="Descargar inventory.json"
+          onPress={onExportInventory}
+        />
+      </View>
+      <View style={styles.searchSpacing}>
+        <SearchBar
+          value={searchQuery}
+          onChangeText={onSearchChange}
+          placeholder="Search"
+        />
+      </View>
       <ScrollView style={styles.scroll}>
         {filtered.length === 0 ? (
           <Text style={styles.empty}>No items</Text>
@@ -77,4 +87,6 @@ const styles = StyleSheet.create({
   column: { flex: 1, padding: 8 },
   scroll: { flex: 1 },
   empty: { color: "#666", padding: 8 },
+  buttonSpacing: { marginTop: 5 },
+  searchSpacing: { marginTop: 5 },
 });

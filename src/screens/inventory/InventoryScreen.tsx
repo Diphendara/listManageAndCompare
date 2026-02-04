@@ -115,6 +115,17 @@ export function InventoryScreen({
     [inventoryService]
   );
 
+  const handleExportInventory = useCallback(() => {
+    const jsonString = JSON.stringify(inventory, null, 2);
+    const blob = new Blob([jsonString], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "inventory.json";
+    link.click();
+    URL.revokeObjectURL(url);
+  }, [inventory]);
+
   return (
     <View style={[styles.container, isMobile && styles.containerMobile]}>
       <View style={[styles.column, isMobile && styles.columnMobile]}>
@@ -123,6 +134,7 @@ export function InventoryScreen({
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}
           onImportFile={handleImportFile}
+          onExportInventory={handleExportInventory}
         />
       </View>
       {!isMobile && (

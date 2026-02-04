@@ -6,17 +6,22 @@
 import React from "react";
 import { View, Text, ScrollView, StyleSheet } from "react-native";
 import { Card } from "../../components/Card";
+import { Button } from "../../components/Button";
 import { formatListItem } from "../../utils/listItemFormat";
 import type { CustomList } from "../../models/CustomList";
 
 export interface ListPreviewProps {
   selectedList: CustomList | null;
+  onDownloadAllLists: () => void;
 }
 
-export function ListPreview({ selectedList }: ListPreviewProps): React.JSX.Element {
+export function ListPreview({ selectedList, onDownloadAllLists }: ListPreviewProps): React.JSX.Element {
   return (
     <View style={styles.column}>
-      <Text style={styles.title}>Preview</Text>
+      <View style={styles.header}>
+        <Text style={styles.title}>Preview</Text>
+        <Button title="Descargar todas" onPress={onDownloadAllLists} />
+      </View>
       <ScrollView style={styles.scroll}>
         {!selectedList ? (
           <Text style={styles.empty}>Select a list</Text>
@@ -36,7 +41,8 @@ export function ListPreview({ selectedList }: ListPreviewProps): React.JSX.Eleme
 
 const styles = StyleSheet.create({
   column: { flex: 1, padding: 8 },
-  title: { fontWeight: "bold", marginBottom: 8 },
+  header: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 8 },
+  title: { fontWeight: "bold" },
   scroll: { flex: 1 },
   empty: { color: "#666", padding: 8 },
 });

@@ -17,6 +17,7 @@ import type { CustomListsService } from "../../services/customListsService";
 import { SearchBar } from "../../components/SearchBar";
 import { TextArea } from "../../components/TextArea";
 import { Button } from "../../components/Button";
+import { Toast } from "../../components/Toast";
 import { parseText } from "../../parsers/itemParser";
 import type { Inventory } from "../../models/Inventory";
 import type { CustomList } from "../../models/CustomList";
@@ -171,6 +172,7 @@ export function ComparisonsScreen({
   const [expandedItem, setExpandedItem] = useState<string | null>(null);
   const [showResults, setShowResults] = useState(false);
   const [expandedListsSection, setExpandedListsSection] = useState(!isMobile);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   const handleToggleExpandedListsSection = useCallback(() => {
     if (!isMobile) return;
@@ -309,6 +311,66 @@ export function ComparisonsScreen({
     }
   }, [customListsService]);
 
+  const handleCopyCardsYouHave = useCallback(() => {
+    if (cardsYouHave.length === 0) {
+      setToastMessage("No hay cartas disponibles");
+      return;
+    }
+    const text = cardsYouHave
+      .map((item) => `${item.quantity}x ${toTitleCase(item.name)}`)
+      .join("\n");
+    navigator.clipboard.writeText(text);
+    setToastMessage("Cartas copiadas");
+  }, [cardsYouHave]);
+
+  const handleCopyCardsMissing = useCallback(() => {
+    if (cardsMissing.length === 0) {
+      setToastMessage("No hay cartas no disponibles");
+      return;
+    }
+    const text = cardsMissing
+      .map((item) => `${item.quantity}x ${toTitleCase(item.name)}`)
+      .join("\n");
+    navigator.clipboard.writeText(text);
+    setToastMessage("Cartas copiadas");
+  }, [cardsMissing]);
+
+  const handleDownloadCardsYouHave = useCallback(() => {
+    if (cardsYouHave.length === 0) {
+      setToastMessage("No hay cartas disponibles");
+      return;
+    }
+    const text = cardsYouHave
+      .map((item) => `${item.quantity}x ${toTitleCase(item.name)}`)
+      .join("\n");
+    const blob = new Blob([text], { type: "text/plain" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "cartas_disponibles.txt";
+    link.click();
+    URL.revokeObjectURL(url);
+    setToastMessage("Descargado");
+  }, [cardsYouHave]);
+
+  const handleDownloadCardsMissing = useCallback(() => {
+    if (cardsMissing.length === 0) {
+      setToastMessage("No hay cartas no disponibles");
+      return;
+    }
+    const text = cardsMissing
+      .map((item) => `${item.quantity}x ${toTitleCase(item.name)}`)
+      .join("\n");
+    const blob = new Blob([text], { type: "text/plain" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "cartas_no_disponibles.txt";
+    link.click();
+    URL.revokeObjectURL(url);
+    setToastMessage("Descargado");
+  }, [cardsMissing]);
+
   return (
     <View style={[styles.container, isMobile && styles.containerMobile]}>
       <LeftColumn
@@ -329,7 +391,15 @@ export function ComparisonsScreen({
       {(!isMobile || showResults) && (
         <>
           <View style={[styles.column, isMobile && styles.columnMobileResults]}>
-            <Text style={styles.columnTitle}>Cartas que tienes</Text>
+            <View style={styles.columnHeader}>
+              <Text style={styles.columnTitle}>Cartas disponibles</Text>
+              <Pressable style={styles.copyIconButton} onPress={handleCopyCardsYouHave}>
+                <Text style={styles.copyIcon}>📋</Text>
+              </Pressable>
+              <Pressable style={styles.downloadIconButton} onPress={handleDownloadCardsYouHave}>
+                <Text style={styles.downloadIcon}>⬇️</Text>
+              </Pressable>
+            </View>
             <ScrollView style={styles.scroll}>
               {cardsYouHave.length === 0 ? (
                 <Text style={styles.empty}>No hay cartas</Text>
@@ -345,7 +415,15 @@ export function ComparisonsScreen({
             </ScrollView>
           </View>
           <View style={[styles.column, isMobile && styles.columnMobileResults]}>
-            <Text style={styles.columnTitle}>Cartas que faltan</Text>
+            <View style={styles.columnHeader}>
+              <Text style={styles.columnTitle}>Cartas no disponibles</Text>
+              <Pressable style={styles.copyIconButton} onPress={handleCopyCardsMissing}>
+                <Text style={styles.copyIcon}>📋</Text>
+              </Pressable>
+              <Pressable style={styles.downloadIconButton} onPress={handleDownloadCardsMissing}>
+                <Text style={styles.downloadIcon}>⬇️</Text>
+              </Pressable>
+            </View>
             <ScrollView style={styles.scroll}>
               {cardsMissing.length === 0 ? (
                 <Text style={styles.empty}>No hay cartas</Text>
@@ -391,6 +469,11 @@ export function ComparisonsScreen({
           />
         </View>
       )}
+      <Toast
+        message={toastMessage || ""}
+        visible={toastMessage !== null}
+        onHide={() => setToastMessage(null)}
+      />
     </View>
   );
 }
@@ -437,6 +520,25 @@ const styles = StyleSheet.create({
     marginBottom: 5,
   },
   columnTitle: { fontWeight: "bold", marginBottom: 8 },
+  columnHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 8,
+  },
+  copyIconButton: {
+    padding: 4,
+  },
+  copyIcon: {
+    fontSize: 20,
+  },
+  downloadIconButton: {
+    padding: 4,
+    marginLeft: 4,
+  },
+  downloadIcon: {
+    fontSize: 20,
+  },
   scroll: { flex: 1 },
   scrollMobile: { maxHeight: 225 },
   empty: { color: "#666", padding: 8 },
