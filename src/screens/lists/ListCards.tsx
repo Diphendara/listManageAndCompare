@@ -145,19 +145,21 @@ export function ListCards({
           </View>
         )}
       </ScrollView>
-      <View style={styles.importButtonContainer}>
-        <MultiFileImportButton
-          title="Importar listas"
-          onFilesRead={onImportLists}
-          accept=".json,.txt"
-        />
-        {importMessage && (
-          <Text style={styles.importMessage}>{importMessage}</Text>
-        )}
+      <View style={[styles.buttonsRow, isMobile && styles.buttonsRowMobile]}>
+        <View style={[styles.importButtonContainer, isMobile && styles.buttonMobile]}>
+          <MultiFileImportButton
+            title="Importar listas"
+            onFilesRead={onImportLists}
+            accept=".json,.txt"
+          />
+        </View>
+        <View style={[styles.downloadButtonContainer, isMobile && styles.buttonMobile]}>
+          <Button title="Descargar todas" onPress={onDownloadAllLists} />
+        </View>
       </View>
-      <View style={styles.downloadButtonContainer}>
-        <Button title="Descargar todas" onPress={onDownloadAllLists} />
-      </View>
+      {importMessage && (
+        <Text style={styles.importMessage}>{importMessage}</Text>
+      )}
       {showDownloadDialog && (
         <Card>
           <View style={styles.formatDialogPanel}>
@@ -331,8 +333,21 @@ const styles = StyleSheet.create({
     paddingTop: 8,
     alignItems: "center",
   },
+  buttonsRow: {
+    flexDirection: "column",
+  },
+  buttonsRowMobile: {
+    flexDirection: "row",
+    gap: 8,
+    paddingHorizontal: 8,
+  },
+  buttonMobile: {
+    flex: 1,
+    paddingTop: 8,
+  },
   importMessage: {
     marginTop: 8,
+    marginHorizontal: 8,
     padding: 8,
     fontSize: 13,
     color: "#333",
