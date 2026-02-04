@@ -197,13 +197,13 @@ export function ComparisonsScreen({
     if (!inventoryService) return;
     const data = await inventoryService.loadInventory();
     setInventory(data);
-  }, [inventoryService]);
+  }, [inventoryService, refreshTrigger]);
 
   const loadLists = useCallback(async () => {
     if (!customListsService) return;
     const data = await customListsService.getAllLists();
     setLists(data);
-  }, [customListsService]);
+  }, [customListsService, refreshTrigger]);
 
   useEffect(() => {
     void loadInventory();
@@ -229,10 +229,11 @@ export function ComparisonsScreen({
     return groupedInventory.filter((it) => it.name.toLowerCase().includes(query));
   }, [groupedInventory, searchQuery]);
 
-  // Sum quantities by name across ALL saved lists (regardless of inUse)
+  // Sum quantities by name across lists that are inUse
   const listTotalsByName = React.useMemo(() => {
     const totals = new Map<string, number>();
     for (const list of lists) {
+      if (!list.inUse) continue;
       for (const item of list.decklist) {
         const key = item.name.trim().toLowerCase();
         totals.set(key, (totals.get(key) ?? 0) + item.quantity);
