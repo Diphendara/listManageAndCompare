@@ -35,6 +35,7 @@ export function CustomListsScreen({
   const [expandedDeleteListName, setExpandedDeleteListName] = useState<string | null>(null);
   const [showCreateInput, setShowCreateInput] = useState(false);
   const [createName, setCreateName] = useState("");
+  const [showDownloadDialog, setShowDownloadDialog] = useState(false);
   const createNameInputRef = useRef<TextInput | null>(null);
 
   // Load lists on mount and when refreshTrigger changes
@@ -243,33 +244,61 @@ export function CustomListsScreen({
     [lists, selectedListName, customListsService]
   );
 
-  const handleDownloadAllLists = useCallback(async () => {
+  const handleDownloadAllLists = useCallback(() => {
     if (lists.length === 0) {
       Alert.alert("Info", "No hay listas para descargar");
       return;
     }
+    setShowDownloadDialog(true);
+  }, [lists]);
 
+  const handleDownloadJSON = useCallback(async () => {
     try {
-      // Dynamic import JSZip
       const JSZip = (await import("jszip")).default;
       const zip = new JSZip();
 
-      // Add each list as a JSON file
       lists.forEach((list) => {
         const jsonString = JSON.stringify(list, null, 2);
         zip.file(`${list.name}.json`, jsonString);
       });
 
-      // Generate zip blob
       const blob = await zip.generateAsync({ type: "blob" });
-      
-      // Create download link
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
       link.download = "all_lists.zip";
       link.click();
       URL.revokeObjectURL(url);
+      setShowDownloadDialog(false);
+    } catch (err) {
+      Alert.alert(
+        "Error",
+        err instanceof Error ? err.message : "No se pudo crear el archivo zip"
+      );
+    }
+  }, [lists]);
+
+  const handleDownloadTXT = useCallback(async () => {
+    try {
+      const JSZip = (await import("jszip")).default;
+      const zip = new JSZip();
+
+      lists.forEach((list) => {
+        const textLines = list.decklist.map(
+          (item) => `${item.quantity}x ${item.name}`
+        );
+        const text = textLines.join("\n");
+        zip.file(`${list.name}.txt`, text);
+      });
+
+      const blob = await zip.generateAsync({ type: "blob" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "all_lists.zip";
+      link.click();
+      URL.revokeObjectURL(url);
+      setShowDownloadDialog(false);
     } catch (err) {
       Alert.alert(
         "Error",
@@ -291,6 +320,10 @@ export function CustomListsScreen({
           onConfirmDeleteList={handleConfirmDeleteList}
           loading={loading}
           onDownloadAllLists={handleDownloadAllLists}
+          showDownloadDialog={showDownloadDialog}
+          onDownloadJSON={handleDownloadJSON}
+          onDownloadTXT={handleDownloadTXT}
+          onCancelDownload={() => setShowDownloadDialog(false)}
         />
       </View>
       {!isMobile && (
